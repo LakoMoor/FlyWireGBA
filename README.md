@@ -96,7 +96,7 @@ A `vX.Y.Z` tag triggers the release workflow. After validation, it publishes a `
 
 ```sh
 make all test
-python3 tools/package_release.py --tag v0.1.0
+python3 tools/package_release.py --tag v0.1.1
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the release procedure. Actions and downloaded test sources are pinned by SHA/hash.

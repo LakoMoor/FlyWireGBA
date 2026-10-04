@@ -6,7 +6,7 @@ manifest and `SHA256SUMS`.
 
 Local ROM: `dist/fly.gba`, 16,777,216 bytes.
 
-SHA-256: `dd5a96fea85a9de88c092a17ef65eb0d12405bdb4ab73c11506365efb60c7dd3`.
+SHA-256: `df541929673e7dd5688fd3b42fe9e0e76cb7f4355663e6d286ba0609d568012e`.
 
 ## Memory
 
@@ -76,6 +76,8 @@ SQLite, and LibZip disabled. mGBA is not included in the ROM.
   below half a native pixel.
 - Flight includes extended-leg launch/landing poses and folded flight legs.
 - Header/footer labels and pause indication leave the specimen unobstructed.
+- Regression checks in native rendering and actual mGBA output ensure a distant
+  obstacle cannot cover the fly's compound eyes in the reported grooming pose.
 
 See [body-model.md](body-model.md), [body-validation.json](body-validation.json),
 and the animation/turntable sheets linked there.

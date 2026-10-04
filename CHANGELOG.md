@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Corrected obstacle depth order: distant rocks no longer cover the fly's head.
+- Added a regression check for compound-eye visibility beside a distant rock.
+
 ## 0.1.0
 
 - First Game Boy Advance release of FlyWireGBA.

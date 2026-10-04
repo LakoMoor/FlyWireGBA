@@ -122,7 +122,9 @@ static __attribute__((noinline)) void specimen_scene(void){
  worldline(-160,-160,-160,160,181);worldline(160,-160,160,160,181);
  for(int i=0;i<FOOD_COUNT;i++)dish_object(i,1);
  for(int pass=0;pass<2;pass++){
-  for(int i=0;i<OBSTACLE_COUNT;i++)if((obstacles[i].z>fly.z/256)==(pass==0))dish_object(i,0);
+  /* Smaller world Z is farther from the camera. Draw distant rocks first;
+     the previous reversed comparison painted them over the fly's head. */
+  for(int i=0;i<OBSTACLE_COUNT;i++)if((obstacles[i].z>fly.z/256)==(pass==1))dish_object(i,0);
   if(pass==0){Point p=project((Vec){0,0,0});ellipse(p.x+3,p.y+2,fly.zoom==1?30:25,7,176);ellipse(p.x,p.y,18,4,178);flysprite();}
  }
  clip(0,0,W,H);

@@ -37,5 +37,14 @@ int main(void){
    render();
   }
  puts("All 7296 model view/direction/animation combinations rendered safely");
+ /* A distant rock used to be painted over the compound eyes in this pose. */
+ sim_reset();fly.auto_mode=0;fly.x=40*256;fly.z=-20*256;
+ fly.heading=148;fly.state=GROOM;fly.ticks=6;render();
+ int eyes=0;
+ for(int y=54;y<77;y++)for(int x=65;x<96;x++){
+  unsigned c=palette[pixels[y*W+x]];int r=c&31,g=(c>>5)&31,b=(c>>10)&31;
+  if(r>12&&r>2*g&&r>2*b)eyes++;
+ }
+ assert(eyes>=2);puts("Distant rock does not cover the fly's eyes");
  puts("Simulation tests passed");return 0;
 }

@@ -16,8 +16,8 @@ To publish a new version, update `VERSION` and add the matching section to
 `CHANGELOG.md`, then commit those changes and push a version tag:
 
 ```sh
-git tag -a v0.1.1 -m 'FlyWireGBA v0.1.1'
-git push origin v0.1.1
+git tag -a v0.1.2 -m 'FlyWireGBA v0.1.2'
+git push origin v0.1.2
 ```
 
 The Release workflow rebuilds and tests the tag before publishing the `.gba`,

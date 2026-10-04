@@ -58,6 +58,15 @@ int main(int argc,char **argv){
   char name[96];snprintf(name,sizeof(name),"build/model-%d-%d-%02d.ppm",view,state,direction);model_capture(name);
  }
  puts("mGBA: 288 direction/behavior/view framebuffers match native rendering");
+ WRITE(zoom,0);WRITE(x,40*256);WRITE(z,-20*256);WRITE(heading,148);
+ WRITE(state,GROOM);WRITE(height,0);WRITE(ticks,6);run(8,0);
+ int visible_eyes=0;
+ for(int y=54;y<77;y++)for(int x=65;x<96;x++){
+  unsigned c=screen[y*240+x];int r=c&255,g=(c>>8)&255,b=(c>>16)&255;
+  if(r>96&&r>2*g&&r>2*b)visible_eyes++;
+ }
+ assert(visible_eyes>=2);save("build/emulator-occlusion.ppm");
+ puts("mGBA: distant obstacle preserves compound-eye visibility");
  /* A deliberate walkthrough: walk, turn, take off, land, groom, feed,
     neural activity and telemetry, captured without replacing game pixels. */
  core->reset(core);run(120,0);run(16,KEY_SELECT);run(16,0);
