@@ -24,5 +24,18 @@ int main(void){
  assert(fly.meals>0&&fly.hunger<hunger);
  sim_reset();for(int i=0;i<10800;i++){sim_step(0);assert(fly.x>=-150*256&&fly.x<=150*256&&fly.z>=-150*256&&fly.z<=150*256);assert(fly.energy>=0&&fly.energy<=1000&&fly.hunger>=0&&fly.hunger<=1000);if(i%30==0){fly.page=(i/30)%4;fly.zoom=(i/120)%3;fly.stats_detail=(i/240)%2;render();}}
  printf("Autonomous 6 minutes: path %u, feeding ticks %u, collisions %u\n",fly.distance/256,fly.meals,fly.collisions);assert(fly.distance>0&&fly.meals>0);
+ /* Exercise the actual ROM sprite decoder in every view/direction/pose
+    under ASan/UBSan, including launch/landing and folded-flight legs. */
+ sim_reset();fly.auto_mode=0;fly.page=0;
+ const int counts[6]={4,8,10,6,8,2};
+ for(int view=0;view<3;view++)for(int heading=0;heading<256;heading+=4)
+  for(int state=0;state<6;state++)for(int phase=0;phase<counts[state];phase++){
+   fly.zoom=view;fly.heading=heading;fly.state=state;
+   fly.height=state==FLIGHT?(phase==8?4:phase==9?14:36):0;
+   fly.speed=state==WALK?220:0;fly.distance=(uint32_t)phase*256;
+   fly.ticks=phase*(state==GROOM?2:state==FEED?3:state==REST?30:state==IDLE?12:1);
+   render();
+  }
+ puts("All 7296 model view/direction/animation combinations rendered safely");
  puts("Simulation tests passed");return 0;
 }

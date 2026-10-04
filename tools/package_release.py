@@ -17,13 +17,18 @@ name=f'flywire-gba-{tag}'
 try:commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True,stderr=subprocess.DEVNULL).strip()
 except subprocess.CalledProcessError:commit='local-development'
 metadata={'project':'FlyWireGBA','version':version,'tag':tag,'commit':commit,'rom_sha256':hashlib.sha256(rom).hexdigest(),'rom_bytes':len(rom),'data_license':'CC BY-NC 4.0','connectome':json.loads((root/'docs/connectome.json').read_text()),'validation_suite':'Release workflow requires native ASan/UBSan, provenance/header validation and real mGBA cartridge checks'}
+body=json.loads((root/'docs/body-validation.json').read_text())
+metadata['body']={key:body[key] for key in ['source_commit','sprite_sha256','frames','directions','pose_counts','views','mesh_triangles']}
+metadata['body']['license']='Apache-2.0'
 (out/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
 notes=(root/'CHANGELOG.md').read_text().split('## '+version+'\n',1)[1].split('\n## ',1)[0].strip()
-(out/'release-notes.md').write_text(notes+'\n\nDownload `'+name+'.gba` and open it in mGBA or load it on a compatible GBA flash cartridge. Verify with `SHA256SUMS`.\n\nFlyWire-derived data: CC BY-NC 4.0. See the attribution included in the ZIP.\n')
+(out/'release-notes.md').write_text(notes+'\n\nDownload `'+name+'.gba` and open it in mGBA or load it on a compatible GBA flash cartridge. Verify with `SHA256SUMS`.\n\nFlyWire-derived data: CC BY-NC 4.0. Flybody-derived graphics: Apache-2.0. Attribution and licenses are included in the ZIP.\n')
 files={name+'.gba':rom,'README.md':(root/'README.md').read_bytes(),'LICENSE':(root/'LICENSE').read_bytes(),'THIRD_PARTY_NOTICES.md':(root/'THIRD_PARTY_NOTICES.md').read_bytes(),'manifest.json':(out/'manifest.json').read_bytes(),'CHANGELOG.md':(root/'CHANGELOG.md').read_bytes()}
 files['CONTRIBUTING.md']=(root/'CONTRIBUTING.md').read_bytes()
 for doc in sorted((root/'docs').rglob('*')):
  if doc.is_file() and doc.suffix in {'.png','.gif','.md','.csv','.json'}:files[doc.relative_to(root).as_posix()]=doc.read_bytes()
+for license_file in sorted((root/'licenses').glob('*.txt')):
+ files[license_file.relative_to(root).as_posix()]=license_file.read_bytes()
 with zipfile.ZipFile(out/(name+'.zip'),'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as archive:
  for filename,data in sorted(files.items()):
   info=zipfile.ZipInfo(name+'/'+filename,date_time=(1980,1,1,0,0,0));info.compress_type=zipfile.ZIP_DEFLATED;info.external_attr=0o100644<<16;archive.writestr(info,data)

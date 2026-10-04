@@ -1,76 +1,96 @@
-# Проверка итоговой сборки
+# Build and cartridge validation
 
-Проверено 4 октября 2026 года. ROM: `dist/fly.gba`, 65 536 байт.
+Validated on 4 October 2026. Local macOS build: LLVM 23. The Linux CI/release
+build may have a different binary hash; its SHA-256 is published in the release
+manifest and `SHA256SUMS`.
 
-Локальная сборка LLVM 23 на macOS; Linux-сборка GitHub Release может иметь другой хеш, её контрольная сумма опубликована в `SHA256SUMS` и manifest.
+Local ROM: `dist/fly.gba`, 16,777,216 bytes.
 
-SHA-256: `1f7e3627db34a5b02bba5f218b2e44bdfb3f3adf5b9ce7936a5fc7eb107f106a`.
+SHA-256: `dd5a96fea85a9de88c092a17ef65eb0d12405bdb4ab73c11506365efb60c7dd3`.
 
-## Память
+## Memory
 
-Из ELF и карты линкера:
-
-| Ресурс | Занято | Доступно |
+| Resource | Used | Available |
 |---|---:|---:|
-| ROM с выравниванием | 64 КиБ | до 32 МиБ |
-| EWRAM, статические данные | 56 612 байт | 262 144 байта |
-| IWRAM, исполняемый код | 27 712 байт | 32 768 байт |
-| RAM кадра, часть EWRAM | 38 400 байт | — |
-| Буфер треугольников, часть EWRAM | 16 896 байт | — |
-| Две bitmap-страницы VRAM | 81 920 байт, включая промежуток между страницами | 98 304 байта |
+| Padded cartridge ROM | 16 MiB | 32 MiB |
+| EWRAM static data | 39,712 bytes | 262,144 bytes |
+| IWRAM executable code | 26,428 bytes | 32,768 bytes |
+| Framebuffer, included in EWRAM above | 38,400 bytes | — |
+| Bitmap VRAM pages, including page gap | 81,920 bytes | 98,304 bytes |
 
-Оставшаяся IWRAM используется в том числе стеком; линкер ограничивает код 30 КиБ. ROM содержит не всю исходную таблицу, а только отобранную сеть. Карта размещения после сборки: `build/fly.map`.
+The previous triangle buffer is removed. Shaded body frames reside in cartridge
+ROM and are drawn directly from transparent row spans, without a decompression
+buffer. The linker caps IWRAM code at 30 KiB to leave stack space; the actual
+map is in `build/fly.map`.
 
-Новый интерфейс: разделённые сцена и боковая панель, постоянные вкладки, крупные карточки метрик. Новая модель: увеличенный силуэт, сегментированное брюшко, красные глаза и полупрозрачные крылья с жилками. Карта показывает реальные связи выбранного нейрона, а не все активные линии одновременно.
+## Actual ROM in mGBA 0.10.5
 
-## Настоящий ROM в mGBA 0.10.5
+The statically built mGBA core executes the cartridge's ARM7 instructions,
+reads emulated RAM, and captures the actual framebuffer. It uses mGBA's built-in
+BIOS implementation. The screenshots/GIF are cartridge output.
 
-Проверено в собранном статическом ядре mGBA с его встроенной BIOS-реализацией. Исполняются ARM7-инструкции ROM, проверяется эмулируемая память и сохраняется реальный framebuffer. Это не подмена ROM настольной версией симуляции.
+Checks passed:
 
-- Загрузка и продвижение времени: 57 тиков модели после 120 аппаратных кадров с учётом загрузки/отрисовки. Таймер сохраняет частоту модели около 30 Гц даже при медленном рендере.
-- Автономное/ручное управление, движение, полёт и посадка.
-- Чистка и кормление. Для теста кормления положение мухи принудительно устанавливается на сахар, затем проверяется реальный выход сети и счётчик поступления пищи.
-- Обычный 3D, приближённый 3D и 2D.
-- Нейронная карта, оба вида метрик, справка, пауза и продолжение.
+- Boot and time advancement: 58 model ticks after 120 hardware frames, including boot.
+- Autonomous/manual switching, movement, turning, flight, landing, and grooming.
+- Sugar contact, neural response, and food intake. The feeding test places the
+  fly on sugar through emulated RAM, then checks circuit-driven intake.
+- Standard, close, and overhead views, neural map, both telemetry pages, help,
+  pause, and resume.
+- 288 visual captures: 16 headings × six behaviors × three views, with state
+  frozen through emulated RAM to inspect attachments and occlusion. Each viewport is compared pixel by pixel against native rendering, allowing one RGB level for color expansion.
 
-Замеры аппаратным таймером в конкретных сценах:
+Representative hardware-timer readings after the model update:
 
-| Страница | Показание FPS, округление вниз | Примерная частота | CPU, расчёты и рендер / интервал кадра |
+| Scene | Displayed FPS (rounded down) | Approximate refresh | CPU computation/render share |
 |---|---:|---:|---:|
-| Обычная 3D-арена | 11 | 12 FPS | 92% |
-| 2D-арена | 19 | 20 FPS | 90% |
-| Общие метрики | 29 | 30 FPS | 75% |
+| Standard arena | 29 | 30 FPS | 67% |
+| Overhead arena | 29 | 30 FPS | 73% |
+| General telemetry | 29 | 30 FPS | 62% |
 
-Это отдельные замеры, а не минимальная гарантированная частота. Приближённый 3D-вид и плотная активная нейронная карта могут быть медленнее. В ROM частота кадров и загрузка измеряются непрерывно; скорость модели от них отделена.
+These are representative measurements, not a guaranteed worst-case minimum.
+The ROM measures them continuously. Simulation advances at 30 Hz independently
+of rendering. Compared with the previous procedural mesh, the checked standard
+scene improved from about 12 to 30 FPS.
 
-Повторить, имея отдельно собранную статическую библиотеку mGBA:
-
-```sh
-make
-python3 tools/run_emulator_check.py --source /path/to/mgba-0.10.5 --build /path/to/mgba-build
-```
-
-Сборка использовала Clang, mGBA `BUILD_STATIC=ON`, `BUILD_SHARED=OFF`, отключённые Qt/SDL/GL/FFmpeg/PNG/SQLite/LibZip. Для CMake 4 нужен `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`. mGBA не включён в ROM и не требуется для сборки ROM.
-
-Кадры и GIF экспортируются из проверки:
+Reproduce with a separately built static mGBA core:
 
 ```sh
-python3 tools/export_media.py   # требуется Pillow
+make all test
+python3 tools/run_emulator_check.py --source /path/mgba-0.10.5 --build /path/mgba-build
+python3 tools/export_media.py  # Pillow
 ```
 
-На физической консоли/flash-картридже пока не проверено. Звук и сохранение сеанса не реализованы.
+CI builds the checksum-pinned mGBA source with Qt, SDL, OpenGL, FFmpeg, PNG,
+SQLite, and LibZip disabled. mGBA is not included in the ROM.
 
-## Проверки симуляции и данных
+## Anatomy and all model positions
 
-`make test` прошёл с AddressSanitizer и UndefinedBehaviorSanitizer:
+- Original flybody hierarchy and attachment points; 32,980 reduced triangles.
+- 64 headings, 38 animation poses, three camera views: **7,296 frames**.
+- Every generated span, palette index, offset, and viewport bound checked.
+- Every combination rendered under native ASan/UBSan using the ROM decoder.
+- Joint angles checked against original limits; grounded support feet share
+  one plane; walking uses solved tripod stance/swing targets.
+- Maximum solved foot-target error: 0.00007023 model units,
+  below half a native pixel.
+- Flight includes extended-leg launch/landing poses and folded flight legs.
+- Header/footer labels and pause indication leave the specimen unobstructed.
 
-- движение и поворот, набор высоты/посадка, чистка, отдых;
-- столкновение с препятствием и перелёт над ним;
-- три режима отображения, выбор нейрона, переключение страниц и пауза;
-- контакт с сахаром: 17 936 спайков и 67 тиков кормления за 300 тиков; голод снизился с 480 до 3;
-- 6 минут автономной симуляции: сохраняются границы положения, энергии и голода; муха движется и кормится; проверены все страницы/режимы рендера;
-- уникальность 128 root IDs, присутствие аннотированных сенсорных/моторных seeds;
-- соответствие 2048 ROM-связей сохранённым исходным IDs, знакам и квантованным весам;
-- фиксированный байт и контрольная сумма картриджного заголовка, допустимый размер ROM.
+See [body-model.md](body-model.md), [body-validation.json](body-validation.json),
+and the animation/turntable sheets linked there.
 
-Сеть и метрики — демонстрационные, не подтверждение воспроизведения поведения живой мухи. Исходные связи реальны, однако состав сети, веса и динамика сокращены/изменены; навигационный контроллер и геометрия тела процедурные.
+## Simulation and data
+
+ASan/UBSan checks cover movement, takeoff/landing, grooming, rest, obstacles,
+view changes, neuron selection, page switching, pause, and six autonomous minutes.
+Position, energy, and hunger remain bounded; the fly moves and feeds.
+
+The sugar-contact test produced 17,936 spikes and 67 food-intake ticks over 300
+model ticks; hunger fell from 480 to 3. Data tests check 128 unique root IDs,
+published sensory/motor seeds, all 2,048 edges against retained source IDs,
+signs and quantized weights, and the cartridge header/checksum/size.
+
+Physical GBA/flash-cartridge operation has not been tested. Audio and saved
+sessions are not implemented. Neural dynamics, behavioral control, and body
+animations are illustrative; these checks do not establish biological accuracy.

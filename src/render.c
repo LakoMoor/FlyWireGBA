@@ -1,10 +1,6 @@
 #include "fly.h"
 #include "font.h"
-#ifdef __arm__
-#define COLD __attribute__((section(".romcode"),noinline))
-#else
-#define COLD __attribute__((noinline))
-#endif
+#define UI_PAGE __attribute__((noinline))
 
 /* One compact layout for the 240x160 LCD: 18px header, 118px content,
    11px context strip and 13px navigation. World drawing is clipped. */
@@ -72,132 +68,40 @@ static void ellipse(int x,int y,int rx,int ry,int c){
  if(rx<1||ry<1)return;
  for(int j=-ry;j<=ry;j++){int a=j<0?-j:j;int width=rx*circle[a*256/ry]/256;span(x-width,y+j,width*2+1,c);}
 }
-/* High colour bit selects a checker pattern for translucent wings. */
-static void triangle(int x0,int y0,int x1,int y1,int x2,int y2,int c){
- if(y0>y1){int t=x0;x0=x1;x1=t;t=y0;y0=y1;y1=t;}
- if(y1>y2){int t=x1;x1=x2;x2=t;t=y1;y1=y2;y2=t;}
- if(y0>y1){int t=x0;x0=x1;x1=t;t=y0;y0=y1;y1=t;}
- if(y0==y2)return;
- int slope=(x2-x0)*256/(y2-y0),s0=y1>y0?(x1-x0)*256/(y1-y0):0,s1=y2>y1?(x2-x1)*256/(y2-y1):0;
- int start=clamp(y0,clip_top,clip_bottom),end=clamp(y2,clip_top,clip_bottom);
- for(int y=start;y<end;y++){
-  int a=x0*256+(y-y0)*slope,b=y<y1?x0*256+(y-y0)*s0:x1*256+(y-y1)*s1;
-  if(a>b){int t=a;a=b;b=t;}
-  int lo=clamp(a/256,clip_left,clip_right),hi=clamp(b/256,clip_left-1,clip_right-1);
-  if(c&256){for(int x=lo+((lo+y)&1);x<=hi;x+=2)putpixel(x,y,c&255);}
-  else span(lo,y,hi-lo+1,c);
- }
-}
-
+/* The articulated flybody model is rasterized offline with a depth buffer.
+   Sprites stay in ROM; row spans avoid a decompression buffer in EWRAM. */
+#include "body_frames.h"
 typedef struct{int x,y,z;} Vec;
 typedef struct{int x,y,d;} Point;
-typedef struct{Point a,b,c;int depth,color;} Face;
-static Face faces[384];static int face_count;
 static Point project(Vec v){
- if(fly.zoom==2)return (Point){88+v.x,83+v.z-v.y/5,300+v.z};
+ if(fly.zoom==2)return (Point){88+v.x,78+v.z,300+v.z};
  int depth=v.z+330,scale=fly.zoom?400:350;depth=depth<80?80:depth;
- int camera_y=fly.zoom?118+fly.height*3/2:108+fly.height*4/5;
+ int camera_y=90+fly.height*scale/330;
  return (Point){88+v.x*scale/depth,camera_y+(v.z*210-v.y*scale)/depth,depth};
 }
-static Vec local(int x,int y,int z){
- /* Enlarged specimen geometry, separate from the navigation body radius. */
- x=x*3/2;y=y*3/2;z=z*3/2;
- return (Vec){(x*icos(fly.heading)+z*isin(fly.heading))/256,y+fly.height,(z*icos(fly.heading)-x*isin(fly.heading))/256};
-}
-static void meshface(Point a,Point b,Point c,int color){
- if(face_count>=384||(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x)>=0)return;
- faces[face_count++]=(Face){a,b,c,a.d+b.d+c.d,color};
-}
-static void sphere(int cx,int cy,int cz,int rx,int ry,int rz,int base){
- Point v[5][8];const int lat[5]={-256,-181,0,181,256},rad[5]={0,181,256,181,0};
- for(int r=0;r<5;r++)for(int s=0;s<8;s++)
-  v[r][s]=project(local(cx+rx*icos(s*32)*rad[r]/65536,cy+ry*lat[r]/256,cz+rz*isin(s*32)*rad[r]/65536));
- for(int r=0;r<4;r++)for(int s=0;s<8;s++){
-  int t=(s+1)%8,shade=clamp(5+r*2+(icos(s*32+fly.heading+40)>>6),0,15);
-  meshface(v[r][s],v[r][t],v[r+1][s],base+shade);
-  meshface(v[r][t],v[r+1][t],v[r+1][s],base+shade);
+static void flysprite(void){
+ const int first[6]={0,4,12,22,28,36},counts[6]={4,8,10,6,8,2};
+ int state=clamp(fly.state,0,5),phase;
+ if(state==WALK){phase=(int)(fly.distance>>8)&7;if(fly.speed<0)phase=(-phase)&7;}
+ else if(state==FLIGHT)phase=fly.height<=8?8:fly.height<=20?9:(int)fly.ticks&7;
+ else phase=(int)(fly.ticks/(state==GROOM?2:state==FEED?3:state==REST?30:12))%counts[state];
+ int direction=((fly.heading+2)&255)>>2;
+ int index=(fly.zoom*BODY_POSES+first[state]+phase)*BODY_DIRECTIONS+direction;
+ const uint32_t *offsets=(const uint32_t*)(const void*)(fly_sprites+16);
+ const uint8_t *data=fly_sprites+offsets[index];
+ Point ground=project((Vec){0,fly.height,0});
+ int x0=ground.x-data[0],y0=ground.y-data[1],first_y=data[2],rows=data[3];data+=4;
+ for(int row=0;row<rows;row++){
+  int y=y0+first_y+row,n=*data++;
+  for(int i=0;i<n;i++){
+   int x=x0+*data++,length=*data++;
+   if(y>=clip_top&&y<clip_bottom){
+    int lo=clamp(clip_left-x,0,length),hi=clamp(clip_right-x,0,length);
+    for(int k=lo;k<hi;k++)pixels[y*W+x+k]=data[k];
+   }
+   data+=length;
+  }
  }
-}
-static void abdomen(void){
- const int z[7]={-33,-29,-23,-17,-11,-5,0},radius[7]={0,140,225,256,240,180,0};
- Point p[7][8];
- for(int r=0;r<7;r++)for(int s=0;s<8;s++)
-  p[r][s]=project(local(9*icos(s*32)*radius[r]/65536,12+7*isin(s*32)*radius[r]/65536,z[r]));
- for(int r=0;r<6;r++)for(int s=0;s<8;s++){
-  int t=(s+1)%8,shade=clamp(9+isin(s*32)/64,0,15),base=(r&1)?128:144;
-  meshface(p[r][s],p[r][t],p[r+1][s],base+shade);
-  meshface(p[r][t],p[r+1][t],p[r+1][s],base+shade);
- }
-}
-static void limb(int x,int y,int z,int x2,int y2,int z2,int c){
- Point a=project(local(x,y,z)),b=project(local(x2,y2,z2));line(a.x,a.y,b.x,b.y,c);
-}
-static void wings(void){
- for(int side=-1;side<=1;side+=2){
-  int airborne=fly.state==FLIGHT;
-  int flap=airborne?isin((int)fly.ticks*83)/14:0;
-  const int rest_x[6]={4,10,14,13,8,4},open_x[6]={4,20,31,29,18,4};
-  const int z[6]={5,-2,-16,-29,-28,-5};Point p[6];
-  for(int i=0;i<6;i++)p[i]=project(local(side*(airborne?open_x[i]:rest_x[i]),24+flap*(i>0&&i<5),z[i]));
-  for(int i=1;i<5;i++)triangle(p[0].x,p[0].y,p[i].x,p[i].y,p[i+1].x,p[i+1].y,256+61);
-  for(int i=0;i<6;i++)line(p[i].x,p[i].y,p[(i+1)%6].x,p[(i+1)%6].y,BLUE);
-  line(p[0].x,p[0].y,p[3].x,p[3].y,57);line(p[1].x,p[1].y,p[4].x,p[4].y,57);
-  line(p[2].x,p[2].y,p[4].x,p[4].y,57);
- }
-}
-static void flylegs(void){
- for(int side=-1;side<=1;side+=2)for(int leg=0;leg<3;leg++){
-  int phase=(int)fly.ticks*18+(leg==1?128:0)+(side>0?128:0);
-  int stride=fly.state==WALK?isin(phase)/48:0;
-  int lift=fly.state==WALK?clamp(isin(phase)/64,0,4):0;
-  int root_z=13-leg*11,knee_z=root_z+(1-leg)*7,foot_z=knee_z+(1-leg)*6+stride;
-  int knee_x=18,foot_x=26,knee_y=6+lift,foot_y=lift;
-  if(fly.state==FLIGHT){knee_x=12;foot_x=16;knee_y=8;foot_y=5;foot_z-=8;}
-  if(fly.state==GROOM&&leg==0){knee_x=12;foot_x=6;knee_z=24;foot_z=29;foot_y=20+isin((int)fly.ticks*22)/80;knee_y=18;}
-  limb(side*7,15,root_z,side*knee_x,knee_y,knee_z,144+10);
-  limb(side*knee_x,knee_y,knee_z,side*foot_x,foot_y,foot_z,144+8);
-  limb(side*foot_x,foot_y,foot_z,side*(foot_x+3),foot_y,foot_z-2,144+5);
- }
-}
-static void flymesh(void){
- face_count=0;int bob=fly.state==WALK?isin((int)fly.ticks*20)/180:0;
- abdomen();sphere(0,17+bob,4,10,9,12,16);sphere(0,20+bob,21,8,7,8,16);
- sphere(-7,21+bob,24,5,6,5,32);sphere(7,21+bob,24,5,6,5,32);
- for(int i=1;i<face_count;i++){Face f=faces[i];int j=i;
-  while(j>0&&faces[j-1].depth<f.depth){faces[j]=faces[j-1];j--;}faces[j]=f;}
- flylegs();
- for(int i=0;i<face_count;i++){Face *f=&faces[i];triangle(f->a.x,f->a.y,f->b.x,f->b.y,f->c.x,f->c.y,f->color);}
- wings();
- for(int side=-1;side<=1;side+=2){
-  if(side*isin(fly.heading)>-48){Point e=project(local(side*8,24+bob,27));ellipse(e.x,e.y,2,1,220);putpixel(e.x,e.y,WHITE);}
-  limb(side*3,24,26,side*5,27,31,144+6);limb(side*5,27,31,side*7,27,34,144+6);
- }
- if(fly.state==FEED){int pulse=fly.motor?2:0;
-  limb(0,15,28,0,4,34+pulse,32+10);Point tip=project(local(0,4,34+pulse));ellipse(tip.x,tip.y,2,1,32+12);}
-}
-static void flatoval(int cx,int cy,int cz,int rx,int rz,int base){
- Point center=project(local(cx,cy,cz)),p[12];
- for(int i=0;i<12;i++)p[i]=project(local(cx+rx*icos(i*256/12)/256,cy,cz+rz*isin(i*256/12)/256));
- for(int i=0;i<12;i++){int j=(i+1)%12;
-  triangle(center.x,center.y,p[i].x,p[i].y,p[j].x,p[j].y,base+clamp(10+icos(i*256/12+fly.heading)/80,0,15));
-  line(p[i].x,p[i].y,p[j].x,p[j].y,base+5);
- }
-}
-static void flatfly(void){
- flylegs();
- const int z[7]={-33,-29,-23,-17,-11,-5,0},r[7]={0,5,8,9,8,6,0};
- for(int i=0;i<6;i++){
-  Point a=project(local(-r[i],17,z[i])),b=project(local(r[i],17,z[i]));
-  Point c=project(local(-r[i+1],17,z[i+1])),d=project(local(r[i+1],17,z[i+1]));
-  int color=(i&1)?128+13:144+7;
-  triangle(a.x,a.y,b.x,b.y,c.x,c.y,color);triangle(b.x,b.y,d.x,d.y,c.x,c.y,color);
-  line(a.x,a.y,c.x,c.y,144+4);line(b.x,b.y,d.x,d.y,144+4);
- }
- flatoval(0,24,4,10,12,16);flatoval(0,25,21,8,8,16);
- for(int side=-1;side<=1;side+=2){Point e=project(local(side*7,28,24));ellipse(e.x,e.y,6,7,32+7);ellipse(e.x-1,e.y-1,5,6,32+13);ellipse(e.x-2,e.y-3,2,1,220);putpixel(e.x-2,e.y-3,WHITE);}
- wings();
- for(int side=-1;side<=1;side+=2){limb(side*3,26,27,side*7,27,34,144+5);}
- if(fly.state==FEED)limb(0,24,28,0,24,35+(fly.motor?2:0),32+10);
 }
 static Point world(int x,int y,int z){return project((Vec){x-fly.x/256,y,z-fly.z/256});}
 static void worldline(int x,int z,int x2,int z2,int c){Point a=world(x,0,z),b=world(x2,0,z2);line(a.x,a.y,b.x,b.y,c);}
@@ -219,11 +123,9 @@ static __attribute__((noinline)) void specimen_scene(void){
  for(int i=0;i<FOOD_COUNT;i++)dish_object(i,1);
  for(int pass=0;pass<2;pass++){
   for(int i=0;i<OBSTACLE_COUNT;i++)if((obstacles[i].z>fly.z/256)==(pass==0))dish_object(i,0);
-  if(pass==0){Point p=project((Vec){0,0,0});ellipse(p.x+3,p.y+2,fly.zoom==1?30:25,7,176);ellipse(p.x,p.y,18,4,178);if(fly.zoom==2)flatfly();else flymesh();}
+  if(pass==0){Point p=project((Vec){0,0,0});ellipse(p.x+3,p.y+2,fly.zoom==1?30:25,7,176);ellipse(p.x,p.y,18,4,178);flysprite();}
  }
  clip(0,0,W,H);
- rect(7,24,47,12,PANEL);text(11,27,state_names[fly.state],MINT);
- rect(116,24,55,12,165);text(120,27,fly.zoom==2?"TOP VIEW":fly.zoom==1?"CLOSE UP":"3D VIEW",144+4);
 }
 static void minimap(void){
  rect(187,91,44,40,BG);rect(188,92,42,38,CARD);
@@ -231,7 +133,7 @@ static void minimap(void){
  for(int i=0;i<OBSTACLE_COUNT;i++)rect(209+obstacles[i].x/9-1,111+obstacles[i].z/9-1,3,3,DIM);
  int x=209+fly.x/(256*9),y=111+fly.z/(256*9);rect(x-1,y-1,3,3,WHITE);line(x,y,x+isin(fly.heading)/70,y+icos(fly.heading)/70,MINT);
 }
-static COLD void arena(void){
+static UI_PAGE void arena(void){
  specimen_scene();rect(178,18,62,118,PANEL);rect(178,18,1,118,BORDER);
  text(185,25,"ENERGY",MUTED);right_number(233,37,fly.energy/10,INK);text(233,37,"%",MUTED);bar(185,48,48,fly.energy/10,MINT);
  text(185,59,"HUNGER",MUTED);right_number(233,71,fly.hunger/10,INK);text(233,71,"%",MUTED);bar(185,82,48,fly.hunger/10,GOLD);
@@ -244,7 +146,7 @@ static Point nodepoint(int i){
  if(group==2)return (Point){168,76+ordinal*12,0};
  return (Point){48+(ordinal%12)*10,44+(ordinal/12)*9,0};
 }
-static COLD void brain(void){
+static UI_PAGE void brain(void){
  rect(0,18,178,118,BG);rect(178,18,62,118,PANEL);rect(178,18,1,118,BORDER);
  text(7,25,"SENSE",MUTED);text(57,25,"NETWORK",MUTED);text(153,25,"OUT",GOLD);
  Point chosen=nodepoint(fly.selected);unsigned incoming=0,outgoing=0;
@@ -272,7 +174,7 @@ static COLD void brain(void){
  text(7,128,"128 N / 2048 LINKS",MUTED);
 }
 static void stat_row(int x,int y,const char *label,int value,int c){text(x,y,label,MUTED);right_number(x+104,y,value,c);}
-static COLD void stats(void){
+static UI_PAGE void stats(void){
  rect(6,24,112,42,CARD);rect(122,24,112,42,CARD);
  if(fly.stats_detail){
   text(12,29,"ENERGY",MUTED);large_number(12,43,fly.energy/10,MINT);text(49,50,"%",MUTED);
@@ -291,7 +193,7 @@ static COLD void stats(void){
   for(int i=1;i<HISTORY;i++){int a=fly.history[(fly.history_pos+i-1)%HISTORY],b=fly.history[(fly.history_pos+i)%HISTORY];line(8+(i-1)*223/119,133-clamp(a,0,128)*15/128,8+i*223/119,133-clamp(b,0,128)*15/128,MINT);}
  }
 }
-static COLD void help(void){
+static UI_PAGE void help(void){
  text(8,26,"CONTROLS",MINT);
  const char *keys[7]={"DPAD","A","B","A+B","SELECT","START","L / R"};
  const char *actions[7]={"WALK / TURN","GROOM","FLY / LAND","3D / ZOOM / 2D","AUTO / MANUAL","PAUSE","CHANGE SCREEN"};
@@ -300,10 +202,11 @@ static COLD void help(void){
 static void chrome(void){
  rect(0,0,W,18,PANEL);rect(0,17,W,1,BORDER);
  text(7,5,"FLYWIRE",MINT);rect(57,5,1,7,BORDER);
- const char *title[4]={"ARENA","CONNECTOME","TELEMETRY","GUIDE"};text(65,5,title[fly.page],INK);
+ const char *title[4]={"3D ARENA","CONNECTOME","TELEMETRY","GUIDE"};
+ text(65,5,fly.page==0?(fly.zoom==2?"TOP VIEW":fly.zoom==1?"CLOSE 3D":title[0]):title[fly.page],INK);
  rect(200,4,33,10,fly.paused?RED:CARD);text(203,6,fly.paused?"PAUSE":fly.auto_mode?"AUTO":"MAN",fly.paused?CORAL:MINT);
  rect(0,136,W,11,PANEL);
- if(fly.page==0)text(7,138,"A GROOM  B FLY  A+B VIEW",MUTED);
+ if(fly.page==0){text(7,138,state_names[fly.state],MINT);text(50,138,"A GROOM B FLY A+B VIEW",MUTED);}
  else if(fly.page==1){extern const char root_labels[NEURONS][19];text(7,138,root_labels[fly.selected],INK);text(122,138,"DPAD NODE A LINKS",MUTED);}
  else if(fly.page==2)text(7,138,"A RESET  B BODY  START PAUSE",MUTED);
  else text(7,138,"V783 SUBSET / DEMO DYNAMICS",MUTED);
@@ -316,5 +219,4 @@ void render(void){
  if(fly.page!=0)rect(0,18,W,118,BG);
  if(fly.page==0)arena();else if(fly.page==1)brain();else if(fly.page==2)stats();else help();
  chrome();
- if(fly.paused&&fly.page==0){rect(48,69,82,21,PANEL);text(60,76,"PAUSED",GOLD);}
 }

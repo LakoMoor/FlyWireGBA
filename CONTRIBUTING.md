@@ -9,7 +9,7 @@ bash tools/ci_check.sh
 ```
 
 CI builds the actual cartridge, runs ASan/UBSan simulation tests, validates the
-connectome provenance/header, and runs the ROM in a checksum-pinned mGBA core.
+connectome provenance, all model frames/joint limits, and cartridge header, and runs the ROM in a checksum-pinned mGBA core.
 Candidate ROMs, archives, checksums and screenshots are retained as CI artifacts.
 
 To publish a new version, update `VERSION` and add the matching section to
@@ -29,4 +29,4 @@ A failed build never publishes a release. Keep version tags immutable; fix a
 failed tagged release by preparing a new version rather than moving its tag.
 
 Original code/artwork is MIT. The FlyWire-derived data and ROMs containing it
-retain CC BY-NC 4.0 terms; preserve THIRD_PARTY_NOTICES.md in distributions.
+retain CC BY-NC 4.0 terms. Body graphics derive from flybody under Apache-2.0; preserve THIRD_PARTY_NOTICES.md and licenses/ in distributions.

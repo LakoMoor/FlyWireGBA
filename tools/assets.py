@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import json
 # Original compact 5x7 font, generated into source for dependency-free builds.
 glyphs={
 'A':[14,17,17,31,17,17,17],'B':[30,17,17,30,17,17,30],'C':[14,17,16,16,16,17,14],
@@ -33,4 +34,7 @@ colors.extend([(171+i,185+i,173+i) for i in range(16)])
 for base in [(247,172,63),(255,175,120),(105,224,186),(99,135,141)]:
  for i in range(16):colors.append(tuple(int(c*(0.35+0.65*i/15)) for c in base))
 assert len(colors)==256
+sprite_palette=Path('assets/fly_palette.json')
+if sprite_palette.exists():
+ for index,color in json.loads(sprite_palette.read_text()).items():colors[int(index)]=color
 Path('src/palette.c').write_text('#include "fly.h"\nconst uint16_t palette[256]={\n'+','.join(str((r>>3)|((g>>3)<<5)|((b>>3)<<10)) for r,g,b in colors)+'\n};\n')

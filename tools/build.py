@@ -14,7 +14,7 @@ linker=find('ld.lld',list(Path.home().glob('.rustup/toolchains/*/lib/rustlib/*/b
 objcopy=find('llvm-objcopy',['/opt/homebrew/opt/llvm/bin/llvm-objcopy'])
 flags=['--target=arm-none-eabi','-mcpu=arm7tdmi','-marm','-mfloat-abi=soft','-O2','-ffreestanding','-fno-builtin','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-Wall','-Wextra','-Werror','-Isrc']
 objects=[]
-for source in ['src/start.S','src/gba.c','src/sim.c','src/render.c','src/connectome.c','src/palette.c']:
+for source in ['src/start.S','src/sprites.S','src/gba.c','src/sim.c','src/render.c','src/connectome.c','src/palette.c']:
  obj='build/'+Path(source).stem+'.o';objects.append(obj)
  subprocess.run([clang,*flags,'-c',source,'-o',obj],check=True)
 subprocess.run([linker,'-T','gba.ld','-Map=build/fly.map','--gc-sections',*objects,'-o','build/fly.elf'],check=True)

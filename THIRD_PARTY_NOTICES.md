@@ -20,8 +20,27 @@ International; the project's MIT license does not override these terms.
 Modifications: 128 neurons selected by three-hop anatomical relevance between
 sugar sensory seeds and MN9; strongest 2048 induced directed edges retained;
 weights aggregated, transformed and quantized. Details and source hashes are
-in `docs/connectome.json`. Schematic layout and procedural fly body are original
-project artwork. The simulated dynamics are not the calibrated Shiu model.
+in `docs/connectome.json`. The neural map layout is original project artwork.
+The simulated dynamics are not the calibrated Shiu model.
+
+## Anatomical fly body — Apache-2.0
+
+`assets/flybody.npz`, `assets/flybody.json`, `assets/fly.sprites`,
+`assets/fly_palette.json`, body screenshots, and the corresponding ROM graphics
+are derived from flybody, developed by Google DeepMind and HHMI Janelia Research
+Campus. The project's MIT license does not relicense these assets.
+
+- Source: https://github.com/TuragaLab/flybody
+- Source revision: `d015e9bfe441bd90ae431bac24c55cb74bdbce26`
+- Original model: `flybody/fruitfly/assets/fruitfly.xml` and its OBJ meshes
+- Full license: `licenses/flybody-Apache-2.0.txt`
+
+Changes: welded normal-seam vertices, per-material quadric mesh reduction,
+illustrative joint animations within the original joint limits, inverse
+kinematics for foot placement, offline software rasterization, translucent
+wing compositing, and RGB555 palette quantization. Original body transforms,
+limb lengths, and joint attachment points are retained. This ROM does not run
+MuJoCo, flybody physics, or flybody's learned controllers.
 
 ## Cartridge header
 

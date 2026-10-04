@@ -21,5 +21,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 The MIT license applies to original project code and artwork. It does not
-relicense the third-party FlyWire dataset or its derivatives. See
-THIRD_PARTY_NOTICES.md: distributed ROMs contain CC BY-NC 4.0 data.
+relicense the third-party FlyWire dataset or the flybody model and their
+derivatives. See THIRD_PARTY_NOTICES.md: distributed ROMs contain CC BY-NC 4.0
+data and Apache-2.0 body graphics.

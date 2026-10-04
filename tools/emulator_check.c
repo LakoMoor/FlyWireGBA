@@ -15,6 +15,10 @@ static uint32_t base;
 #define READ(field) core->busRead32(core,base+offsetof(Fly,field))
 static void run(int n,unsigned keys){core->setKeys(core,keys);for(int i=0;i<n;i++)core->runFrame(core);}
 static void save(const char *path){FILE *f=fopen(path,"wb");assert(f);fprintf(f,"P6\n240 160\n255\n");for(int i=0;i<240*160;i++){unsigned char rgb[3]={screen[i]&255,(screen[i]>>8)&255,(screen[i]>>16)&255};fwrite(rgb,1,3,f);}fclose(f);}
+#define WRITE(field,value) core->busWrite32(core,base+offsetof(Fly,field),(uint32_t)(value))
+static void model_capture(const char *path){FILE *f=fopen(path,"wb");assert(f);fprintf(f,"P6\n178 118\n255\n");for(int y=18;y<136;y++)for(int x=0;x<178;x++){color_t c=screen[y*240+x];unsigned char rgb[3]={c&255,(c>>8)&255,(c>>16)&255};fwrite(rgb,1,3,f);}fclose(f);}
+static int demo_frame;
+static void demo(int frames,unsigned keys){for(int i=0;i<frames;i++){run(6,keys);char name[80];snprintf(name,sizeof(name),"build/demo-%03d.ppm",demo_frame++);save(name);}}
 int main(int argc,char **argv){
  if(argc!=3){fprintf(stderr,"usage: emulator_check ROM FLY_SYMBOL_ADDRESS\n");return 1;}
  setbuf(stdout,NULL);mLogSetDefaultLogger(&logger);base=(uint32_t)strtoul(argv[2],NULL,16);core=mCoreFind(argv[1]);assert(core&&core->init(core));mCoreInitConfig(core,"flygba-test");
@@ -27,17 +31,39 @@ int main(int argc,char **argv){
  core->busWrite32(core,base+offsetof(Fly,x),-95*256);core->busWrite32(core,base+offsetof(Fly,z),-80*256);
  core->busWrite32(core,base+offsetof(Fly,hunger),480);run(120,0);assert(READ(meals)>0);save("build/emulator-feed.ppm");
  run(16,KEY_A|KEY_B);run(30,0);assert(READ(zoom)==1);save("build/emulator-zoom.ppm");
- run(16,KEY_A|KEY_B);run(90,0);assert(READ(zoom)==2&&READ(fps)>=15);save("build/emulator-2d.ppm");printf("2D: fps=%u cpu=%u\n",READ(fps),READ(cpu));
+ run(16,KEY_A|KEY_B);run(90,0);printf("Overhead: zoom=%u fps=%u cpu=%u\n",READ(zoom),READ(fps),READ(cpu));assert(READ(zoom)==2&&READ(fps)>=15);save("build/emulator-2d.ppm");
  run(16,KEY_R);run(120,0);assert(READ(page)==1);save("build/emulator-brain.ppm");
  run(16,KEY_R);run(120,0);assert(READ(page)==2);save("build/emulator-stats.ppm");printf("Metrics: fps=%u cpu=%u\n",READ(fps),READ(cpu));assert(READ(fps)>=25);
  run(16,KEY_B);run(60,0);assert(READ(stats_detail)==1);save("build/emulator-body.ppm");
  run(16,KEY_START);run(16,0);uint32_t tick=READ(ticks);run(120,0);assert(READ(ticks)==tick&&READ(paused));
  run(16,KEY_START);run(20,0);assert(READ(ticks)>tick);
  run(16,KEY_R);run(30,0);save("build/emulator-help.ppm");
- core->reset(core);unsigned keys[6]={0,KEY_UP|KEY_RIGHT,KEY_B|KEY_UP,0,KEY_A,0};
- for(int segment=0;segment<6;segment++){
-  if(segment==1){run(16,KEY_SELECT);run(16,0);}
-  for(int frame=0;frame<15;frame++){run(6,keys[segment]);char name[80];snprintf(name,sizeof(name),"build/demo-%03d.ppm",segment*15+frame);save(name);}
+ /* Visual checks from actual cartridge output, frozen through emulated RAM
+    so every direction/behavior can be inspected without an opaque overlay. */
+ core->reset(core);run(120,0);WRITE(auto_mode,0);WRITE(paused,1);WRITE(x,0);WRITE(z,0);
+ const int pose_ticks[6]={0,3,4,6,6,0};
+ for(int view=0;view<3;view++)for(int state=0;state<6;state++)for(int direction=0;direction<16;direction++){
+  WRITE(zoom,view);WRITE(state,state);WRITE(heading,direction*16);WRITE(height,state==FLIGHT?36:0);
+  WRITE(ticks,pose_ticks[state]);WRITE(distance,3*256);WRITE(speed,state==WALK?220:0);
+  run(8,0);assert(READ(paused)&&READ(page)==0&&READ(state)==(unsigned)state&&READ(heading)==(unsigned)direction*16&&READ(zoom)==(unsigned)view);
+  /* Compare the compiled ARM framebuffer to the native renderer. The scene
+     is frozen; timer telemetry outside the viewport may legitimately differ. */
+  for(unsigned i=0;i<sizeof(fly);i++)((uint8_t*)&fly)[i]=core->busRead8(core,base+i);
+  render();
+  for(int y=18;y<136;y++)for(int x=0;x<178;x++){
+   unsigned c=palette[pixels[y*W+x]],actual=screen[y*240+x];
+   int expected[3]={(c&31)*255/31,((c>>5)&31)*255/31,((c>>10)&31)*255/31};
+   for(int channel=0;channel<3;channel++){int diff=(int)((actual>>(channel*8))&255)-expected[channel];assert(diff>=-1&&diff<=1);}
+  }
+  char name[96];snprintf(name,sizeof(name),"build/model-%d-%d-%02d.ppm",view,state,direction);model_capture(name);
  }
+ puts("mGBA: 288 direction/behavior/view framebuffers match native rendering");
+ /* A deliberate walkthrough: walk, turn, take off, land, groom, feed,
+    neural activity and telemetry, captured without replacing game pixels. */
+ core->reset(core);run(120,0);run(16,KEY_SELECT);run(16,0);
+ WRITE(x,-40*256);WRITE(z,0);WRITE(heading,24);
+ demo(16,KEY_UP);demo(8,KEY_RIGHT);demo(16,KEY_B|KEY_UP);demo(10,0);demo(12,KEY_A);demo(2,0);
+ WRITE(x,-95*256);WRITE(z,-80*256);WRITE(hunger,480);WRITE(heading,24);demo(12,0);
+ run(16,KEY_R);demo(10,0);run(16,KEY_R);demo(10,0);
  core->deinit(core);puts("mGBA boot, movement, flight, tabs and pause passed");return 0;
 }

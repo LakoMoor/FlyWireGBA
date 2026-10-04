@@ -32,7 +32,7 @@
   "selection": "3-hop forward/reverse anatomical relevance; strongest 2048 induced edges",
   "weight_transform": "sign(w)*round(sqrt(abs(w))*7), clipped to +/-96",
   "model": "Illustrative integer LIF, 30 Hz; not the calibrated Shiu model",
-  "body": "Procedural mesh and heuristic locomotion; MN9 gates feeding",
+  "body": "Articulated flybody-derived graphics and heuristic locomotion; MN9 gates feeding",
   "node_positions": "Synthetic graph layout, not anatomical coordinates",
   "license": "FlyWire data CC BY-NC 4.0; Shiu code MIT",
   "notebook_sha256": "33cd73c0b4b4a291c51b7bab639c4fa28978e49e111ff0d6adbca5687addb84c",
