@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1
+
+- Preserve BIOS/flashcart WAITCNT timings instead of forcing fast ROM reads,
+  addressing SuperCard/SuperFW white-screen and corrupted-ROM symptoms.
+- Mask CPU interrupts before startup; stop inherited DMA channels, timers and audio.
+- Reset bitmap BG2 affine transforms, reference points and blending after launcher handoff.
+- Added an emulated flashcart warm-boot regression with dirty hardware state,
+  slow cartridge timing preservation and pixel-by-pixel framebuffer comparison.
+- SuperFW setup and hardware validation limits documented.
+
 ## 0.2.0
 
 - Added PET Tamagotchi mode with eight care actions and seven condition indicators.

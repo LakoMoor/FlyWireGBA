@@ -6,7 +6,7 @@ manifest and `SHA256SUMS`.
 
 Local ROM: `dist/fly.gba`, 16,777,216 bytes.
 
-SHA-256: `1eeb98808177438d1dae9274bffd12b409925de72984d29ffc701ddb743cda43`.
+SHA-256: `3dc59c771831915b52bfe982ddaa6079bb1f4b2a72d8b8284ff77d3b8c61c960`.
 
 ## Memory
 
@@ -14,7 +14,7 @@ SHA-256: `1eeb98808177438d1dae9274bffd12b409925de72984d29ffc701ddb743cda43`.
 |---|---:|---:|
 | Padded cartridge ROM | 16 MiB | 32 MiB |
 | EWRAM static data | 39,944 bytes | 262,144 bytes |
-| IWRAM executable code | 27,924 bytes | 32,768 bytes |
+| IWRAM executable code | 27,956 bytes | 32,768 bytes |
 | SRAM pet saves | 512 bytes (two banks) | 32,768 bytes |
 | Framebuffer, included in EWRAM above | 38,400 bytes | — |
 | Bitmap VRAM pages, including page gap | 81,920 bytes | 98,304 bytes |
@@ -48,12 +48,15 @@ Representative hardware-timer readings after the model update:
 
 | Scene | Displayed FPS (rounded down) | Approximate refresh | CPU computation/render share |
 |---|---:|---:|---:|
-| Standard arena | 29 | 30 FPS | 67% |
-| Overhead arena | 29 | 30 FPS | 73% |
-| General telemetry | 29 | 30 FPS | 63% |
-| PET | 29 | 30 FPS | 74% |
+| Standard arena | 29 | 30 FPS | 68% |
+| Overhead arena | 29 | 30 FPS | 74% |
+| General telemetry | 29 | 30 FPS | 64% |
+| PET | 19 | 20 FPS | 69% |
 
-These are representative measurements, not a guaranteed worst-case minimum.
+These are representative measurements with the emulator boot timings, not a guaranteed worst-case minimum.
+As of v0.2.1 the ROM preserves BIOS/flashcart WAITCNT rather than forcing fast
+ROM timings. Slower cartridge memory can lower display speed, especially PET;
+simulation continues at 30 Hz.
 The ROM measures them continuously. Simulation advances at 30 Hz independently
 of rendering. Compared with the previous procedural mesh, the checked standard
 scene improved from about 12 to 30 FPS.
@@ -68,6 +71,19 @@ python3 tools/export_media.py  # Pillow
 
 CI builds the checksum-pinned mGBA source with Qt, SDL, OpenGL, FFmpeg, PNG,
 SQLite, and LibZip disabled. mGBA is not included in the ROM.
+
+## Flashcart launcher handoff regression
+
+The harness enters the ROM directly with slow loader timing (`WAITCNT=0x400C`),
+active repeating HBlank DMA, an IRQ-generating timer, enabled IME/IE, and a
+scaled/sheared/offset BG2 with brightness blending. Startup must preserve
+WAITCNT, stop inherited DMA/timers/interrupts and restore an untransformed display.
+All **21,004 viewport pixels** match the native renderer after handoff. The
+released v0.2.0 fails this same regression; v0.2.1 passes. Affine and brightness
+registers are write-only, so their effects are checked through rendered pixels.
+
+This models a launcher handoff; it does not emulate the SuperCard RAM chip or
+prove operation on physical hardware. SuperFW setup is documented in README.
 
 ## Anatomy and all model positions
 

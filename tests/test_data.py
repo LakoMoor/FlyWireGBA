@@ -16,6 +16,9 @@ for e,r in zip(edges,rows):
  assert raw and e[2]*raw>0 and abs(e[2])<=96
 rom=Path('build/fly.gba').read_bytes()
 assert b"SRAM_V113" in rom and rom[172:176]==b"YFWE"
+# Independent cartridge-logo fingerprint verified against devkitPro gbafix.
+assert hashlib.sha256(rom[4:160]).hexdigest()=="08a0153cfd6b0ea54b938f7d209933fa849da0d56f5a34c481060c9ff2fad818"
+assert rom[:4]==bytes.fromhex("2e0000ea")
 assert rom[178]==0x96 and (sum(rom[160:190])+0x19)%256==0
 assert len(rom)<=32*1024*1024 and rom[3]==0xea
 print(f'Provenance and ROM header passed; SHA256 {hashlib.sha256(rom).hexdigest()}')

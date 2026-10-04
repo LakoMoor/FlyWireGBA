@@ -33,8 +33,15 @@ static uint32_t clock_cycles(void){uint16_t hi,lo;do{hi=REG16(0x04000104);lo=REG
 static void vblank(void){while(REG16(0x04000006)>=160){}while(REG16(0x04000006)<160){}}
 static void dma(const void *src,void *dst,unsigned words){REG32(0x040000D4)=(uint32_t)src;REG32(0x040000D8)=(uint32_t)dst;REG32(0x040000DC)=0x84000000|words;}
 int main(void){
- REG16(0x04000208)=0;REG16(0x04000204)=0x4317;
+ REG16(0x04000208)=0;
+ /* Keep the cartridge timings selected by BIOS/flashcart firmware. */
  REG16(0x04000000)=0x0080; /* forced blank */
+ /* Mode 4 uses affine BG2; a launcher may leave a transformed background. */
+ REG16(0x0400000c)=0;
+ REG16(0x04000020)=0x100;REG16(0x04000022)=0;
+ REG16(0x04000024)=0;REG16(0x04000026)=0x100;
+ REG32(0x04000028)=0;REG32(0x0400002c)=0;
+ REG16(0x04000050)=0;REG16(0x04000052)=0;REG16(0x04000054)=0;
  dma(palette,(void*)0x05000000,128);
  REG16(0x04000100)=0;REG16(0x04000104)=0;REG16(0x04000106)=0x0084;REG16(0x04000102)=0x0080;
  sim_reset();save_load();unsigned page=1;uint32_t last=clock_cycles(),sim_clock=last,accumulator=559240;

@@ -25,6 +25,26 @@ A **Game Boy Advance ROM** featuring an articulated fruit fly, a small real FlyW
 - Measured FPS and CPU utilization, simulated time, speed, distance, spikes per second, recently active neurons, contact, feeding and collision counters, spike history, and time spent in each behavior.
 - Pause and session reset. A hardware timer advances simulation at 30 ticks per second independently of display refresh.
 
+## SuperCard / SuperFW
+
+Use **v0.2.1 or newer**. Earlier builds force fast cartridge timings that are
+unsuitable for SuperCard RAM. The ROM now preserves the timings chosen by the
+firmware and resets the display after the launcher hands over control.
+
+Copy the new `.gba` under a new filename and launch it as a fresh game, rather
+than restoring an old savestate or Quick Load snapshot. Select **No patching**
+for this homebrew ROM; it already uses native SRAM and preserves loader timings.
+Disable the **In-game
+menu (IGM)** for this ROM: it polls input and does not implement an IRQ handler
+for firmware hooks. Use **SRAM** saves; SuperFW transfers battery-backed SRAM
+to the SD card on reboot. Retain your existing `.sav` file for pet progress.
+
+If corruption continues, disable **Fast ROM loading** in SuperFW and load the
+file again. The firmware documents slow-memory timing, IGM and loading issues
+in its [troubleshooting guide](https://superfw.davidgf.net/docs/usermanual/troubleshooting/).
+These changes are regression-tested in mGBA; confirmation on physical
+SuperCard hardware is still needed. Display speed depends on cartridge timings.
+
 ## Controls
 
 | GBA button | Action |
@@ -110,7 +130,7 @@ A `vX.Y.Z` tag triggers the release workflow. After validation, it publishes a `
 
 ```sh
 make all test
-python3 tools/package_release.py --tag v0.2.0
+python3 tools/package_release.py --tag v0.2.1
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the release procedure. Actions and downloaded test sources are pinned by SHA/hash.

@@ -9,10 +9,34 @@ _rom:
 .section .text.start,"ax"
 .global _start
 _start:
- mov r0, #0x12
+ /* Flashcart launchers may leave IRQs, DMA and display transforms active.
+    Preserve WAITCNT: SuperCard RAM cannot tolerate fast retail-ROM timings. */
+ mov r0, #0xd3
+ msr cpsr_c, r0
+ ldr sp, =0x03007fe0
+ mov r1, #0x04000000
+ mov r2, #0
+ add r4, r1, #0x200
+ strh r2, [r4, #8]
+ strh r2, [r4]
+ ldr r3, =0x3fff
+ strh r3, [r4, #2]
+ mov r3, #0x80
+ strh r3, [r1]
+ strh r2, [r1, #0xba]
+ strh r2, [r1, #0xca]
+ strh r2, [r1, #0xda]
+ strh r2, [r1, #0xea]
+ add r4, r1, #0x100
+ strh r2, [r4, #2]
+ strh r2, [r4, #6]
+ strh r2, [r4, #10]
+ strh r2, [r4, #14]
+ strh r2, [r1, #0x84]
+ mov r0, #0xd2
  msr cpsr_c, r0
  ldr sp, =0x03007fa0
- mov r0, #0x1f
+ mov r0, #0xdf
  msr cpsr_c, r0
  ldr sp, =0x03007f00
  ldr r0, =__bss_start
