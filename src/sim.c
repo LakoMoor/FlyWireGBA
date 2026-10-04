@@ -11,6 +11,7 @@ static int approx_distance(int dx,int dz){if(dx<0)dx=-dx;if(dz<0)dz=-dz;return d
 void sim_reset(void){
  uint8_t *p=(uint8_t*)&fly;for(unsigned i=0;i<sizeof(fly);i++)p[i]=0;
  fly.x=-40*256;fly.z=-10*256;fly.heading=148;fly.energy=900;fly.hunger=480;fly.auto_mode=1;fly.zoom=0;fly.show_links=1;fly.rng=0xF17E1234;fly.fps=30;
+ pet_reset();
 }
 void neural_step(void){
  /* One 33.3 ms illustrative LIF tick. Anatomical edges are real; this is not
@@ -38,10 +39,13 @@ void neural_step(void){
 }
 void sim_step(uint16_t keys){
  uint16_t hit=keys&~fly.last_keys;fly.last_keys=keys;
- if(hit&KEY_R)fly.page=(fly.page+1)%4;
- if(hit&KEY_L)fly.page=(fly.page+3)%4;
+ int old_page=fly.page;
+ if(hit&KEY_R)fly.page=(fly.page+1)%5;
+ if(hit&KEY_L)fly.page=(fly.page+4)%5;
+ if(fly.page==4&&old_page!=4)pet_enter();
+ if(fly.page==0&&old_page!=0&&fly.pet.mode)pet_leave();
  if(hit&KEY_START)fly.paused=!fly.paused;
- if(hit&KEY_SELECT)fly.auto_mode=!fly.auto_mode;
+ if((hit&KEY_SELECT)&&!fly.pet.mode)fly.auto_mode=!fly.auto_mode;
  if(fly.page==1){
   if(hit&KEY_RIGHT)fly.selected=(fly.selected+1)%NEURONS;
   if(hit&KEY_LEFT)fly.selected=(fly.selected+NEURONS-1)%NEURONS;
@@ -50,10 +54,11 @@ void sim_step(uint16_t keys){
   if(hit&KEY_A)fly.show_links=!fly.show_links;
  }
  if(fly.page==2&&(hit&KEY_B))fly.stats_detail=!fly.stats_detail;
- if(fly.page==2&&(hit&KEY_A)){int page=fly.page;sim_reset();fly.page=page;fly.last_keys=keys;return;}
+ if(fly.page==2&&(hit&KEY_A)){int page=fly.page;Pet saved=fly.pet;sim_reset();fly.pet=saved;if(saved.mode)pet_enter();fly.page=page;fly.last_keys=keys;return;}
  if(fly.page==0&&(hit&KEY_A)&&(keys&KEY_B))fly.zoom=(fly.zoom+1)%3;
  if(fly.paused)return;
  fly.ticks++;
+ if(fly.pet.mode){pet_step(keys,hit);return;}
  int x=fly.x/256,z=fly.z/256;
  fly.food_dist=10000;fly.nearest=0;
  for(int i=0;i<FOOD_COUNT;i++){int d=approx_distance(food[i].x-x,food[i].z-z)-food[i].r;if(d<fly.food_dist){fly.food_dist=d;fly.nearest=i;}}

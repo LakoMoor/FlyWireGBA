@@ -20,3 +20,6 @@ for view in range(3):
    im=Image.open(f'build/model-{view}-{state}-{direction:02d}.ppm')
    sheet.paste(im,((direction%8)*178,(state*2+direction//8)*118))
  sheet.save(f'docs/body-turntable-{view}.png')
+
+pet_frames=[Image.open(p).resize((720,480),Image.Resampling.NEAREST) for p in sorted(Path("build").glob("pet-*.ppm"))]
+if pet_frames:pet_frames[0].save("docs/pet.gif",save_all=True,append_images=pet_frames[1:],duration=100,loop=0,optimize=True)

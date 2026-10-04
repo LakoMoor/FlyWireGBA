@@ -86,3 +86,19 @@ __aeabi_uidivmod:
  mov r1, r0
  mov r0, #0
  bx lr
+/* Freestanding ARM ABI structure-copy helpers (all alignments supported). */
+.section .romcode,"ax",%progbits
+.global __aeabi_memcpy
+.global __aeabi_memcpy4
+.global __aeabi_memcpy8
+__aeabi_memcpy:
+__aeabi_memcpy4:
+__aeabi_memcpy8:
+ cmp r2,#0
+ bxeq lr
+1:
+ ldrb r3,[r1],#1
+ strb r3,[r0],#1
+ subs r2,r2,#1
+ bne 1b
+ bx lr

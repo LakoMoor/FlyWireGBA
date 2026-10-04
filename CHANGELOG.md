@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Added PET Tamagotchi mode with eight care actions and seven condition indicators.
+- Food intake remains gated by MN9; care, sleep, play, injury and neglect affect the pet.
+- Added age, bond, stress, death and a three-second held-button new-pet action.
+- Added checksum-protected, two-bank SRAM persistence and interrupted-write recovery.
+- Added native sanitizer and real-cartridge pet/save checks, English help and a care GIF.
+
 ## 0.1.1
 
 - Corrected obstacle depth order: distant rocks no longer cover the fly's head.

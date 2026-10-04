@@ -20,6 +20,7 @@ metadata={'project':'FlyWireGBA','version':version,'tag':tag,'commit':commit,'ro
 body=json.loads((root/'docs/body-validation.json').read_text())
 metadata['body']={key:body[key] for key in ['source_commit','sprite_sha256','frames','directions','pose_counts','views','mesh_triangles']}
 metadata['body']['license']='Apache-2.0'
+metadata['pet']={'save_type':'SRAM','save_bytes':32768,'format_version':1,'banks':2,'simulation_hz':30,'idle_checkpoint_seconds':30}
 (out/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
 notes=(root/'CHANGELOG.md').read_text().split('## '+version+'\n',1)[1].split('\n## ',1)[0].strip()
 (out/'release-notes.md').write_text(notes+'\n\nDownload `'+name+'.gba` and open it in mGBA or load it on a compatible GBA flash cartridge. Verify with `SHA256SUMS`.\n\nFlyWire-derived data: CC BY-NC 4.0. Flybody-derived graphics: Apache-2.0. Attribution and licenses are included in the ZIP.\n')

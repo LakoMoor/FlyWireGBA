@@ -15,6 +15,7 @@ for e,r in zip(edges,rows):
  raw=int(r['signed_synapses'])
  assert raw and e[2]*raw>0 and abs(e[2])<=96
 rom=Path('build/fly.gba').read_bytes()
+assert b"SRAM_V113" in rom and rom[172:176]==b"YFWE"
 assert rom[178]==0x96 and (sum(rom[160:190])+0x19)%256==0
 assert len(rom)<=32*1024*1024 and rom[3]==0xea
 print(f'Provenance and ROM header passed; SHA256 {hashlib.sha256(rom).hexdigest()}')

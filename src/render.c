@@ -1,6 +1,11 @@
 #include "fly.h"
 #include "font.h"
 #define UI_PAGE __attribute__((noinline))
+#ifdef __arm__
+#define PET_PAGE __attribute__((section(".romcode"),noinline))
+#else
+#define PET_PAGE __attribute__((noinline))
+#endif
 
 /* One compact layout for the 240x160 LCD: 18px header, 118px content,
    11px context strip and 13px navigation. World drawing is clipped. */
@@ -141,6 +146,33 @@ static UI_PAGE void arena(void){
  text(185,59,"HUNGER",MUTED);right_number(233,71,fly.hunger/10,INK);text(233,71,"%",MUTED);bar(185,82,48,fly.hunger/10,GOLD);
  minimap();
 }
+static PET_PAGE void pet_screen(void){
+ clip(0,18,178,118);
+ for(int y=18;y<136;y++)span(0,y,178,160+clamp((y-18)/12,0,15));
+ for(int i=-96;i<=96;i+=48){worldline(i,-96,i,96,177);worldline(-96,i,96,i,177);}
+ worldline(-96,-96,96,-96,181);worldline(-96,96,96,96,181);
+ worldline(-96,-96,-96,96,181);worldline(96,-96,96,96,181);
+ Point shadow=project((Vec){0,0,0});ellipse(shadow.x,shadow.y+2,22,5,178);
+ if(fly.pet.food_timer){
+  Point bowl=world(fly.x/256+isin(fly.heading)*22/256,0,fly.z/256+icos(fly.heading)*22/256);
+  ellipse(bowl.x,bowl.y,10,5,192+8);ellipse(bowl.x,bowl.y-1,7,3,192+14);
+ }
+ flysprite();
+ if(fly.pet.fear_timer){rect(0,18,178,1,CORAL);rect(0,135,178,1,CORAL);rect(0,18,1,118,CORAL);rect(177,18,1,118,CORAL);}
+ clip(0,0,W,H);rect(178,18,62,118,PANEL);rect(178,18,1,118,BORDER);
+ const char *labels[7]={"HEALTH","FOOD","WATER","ENERGY","CLEAN","STRESS","BOND"};
+ const int values[7]={fly.pet.health,1000-fly.pet.hunger,fly.pet.water,fly.pet.energy,fly.pet.clean,fly.pet.stress,fly.pet.bond};
+ for(int i=0;i<7;i++){int y=22+i*16;int c=i==5?CORAL:values[i]<250?GOLD:MINT;
+  text(185,y,labels[i],MUTED);bar(185,y+10,26,values[i]/10,c);right_number(234,y+9,values[i]/10,c);
+ }
+ if(fly.pet.dead){rect(11,28,152,25,PANEL);text(20,32,"LIFE ENDED",CORAL);text(20,43,"HOLD A+B: NEW FLY",MUTED);}
+ if(fly.pet.menu){
+  rect(8,25,162,104,PANEL);text(14,30,"CARE / A TO APPLY",MINT);
+  for(int i=0;i<CARE_COUNT;i++){int x=14+(i%2)*78,y=47+(i/2)*19;
+   rect(x,y,72,15,i==fly.pet.action?TEAL:CARD);text(x+5,y+4,care_names[i],i==fly.pet.action?WHITE:MUTED);
+  }
+ }
+}
 static Point nodepoint(int i){
  /* Ordered by role, not anatomical soma coordinates. */
  int group=neuron_group[i],ordinal=0;for(int j=0;j<i;j++)if(neuron_group[j]==group)ordinal++;
@@ -188,8 +220,8 @@ static UI_PAGE void stats(void){
   text(12,29,"FRAME RATE",MUTED);large_number(12,43,fly.fps,INK);text(49,50,"FPS",MUTED);text(77,42,"CPU",DIM);number(77,53,fly.cpu,MINT);
   text(128,29,"SPIKES / S",MUTED);large_number(128,43,fly.rate,MINT);
   stat_row(8,74,"TIME S",fly.ticks/30,INK);stat_row(126,74,"ACTIVE",fly.active,MINT);
-  stat_row(8,85,"SPEED",(fly.speed<0?-fly.speed:fly.speed)*30/256,INK);stat_row(126,85,"FEED",fly.meals,GOLD);
-  stat_row(8,96,"PATH",fly.distance/256,INK);stat_row(126,96,"HITS",fly.collisions,CORAL);
+  stat_row(8,85,"SPEED",(fly.speed<0?-fly.speed:fly.speed)*30/256,INK);stat_row(126,85,"FEED",fly.pet.mode?fly.pet.feeds:fly.meals,GOLD);
+  stat_row(8,96,"PATH",fly.distance/256,INK);stat_row(126,96,"HITS",fly.pet.mode?fly.pet.hits:fly.collisions,CORAL);
   text(8,110,"SPIKES/TICK",MUTED);text(180,110,"LAST 4S",DIM);
   for(int y=121;y<=133;y+=6)line(8,y,231,y,BORDER);
   for(int i=1;i<HISTORY;i++){int a=fly.history[(fly.history_pos+i-1)%HISTORY],b=fly.history[(fly.history_pos+i)%HISTORY];line(8+(i-1)*223/119,133-clamp(a,0,128)*15/128,8+i*223/119,133-clamp(b,0,128)*15/128,MINT);}
@@ -199,26 +231,34 @@ static UI_PAGE void help(void){
  text(8,26,"CONTROLS",MINT);
  const char *keys[7]={"DPAD","A","B","A+B","SELECT","START","L / R"};
  const char *actions[7]={"WALK / TURN","GROOM","FLY / LAND","3D / ZOOM / 2D","AUTO / MANUAL","PAUSE","CHANGE SCREEN"};
- for(int i=0;i<7;i++){int y=42+i*12;text(8,y,keys[i],GOLD);text(66,y,actions[i],INK);}
+ for(int i=0;i<7;i++){int y=39+i*10;text(8,y,keys[i],GOLD);text(66,y,actions[i],INK);}
+ text(8,115,"PET: DPAD PICK A USE B MENU",MINT);text(8,127,"PET: HOLD A+B 3S NEW FLY",MUTED);
 }
 static void chrome(void){
  rect(0,0,W,18,PANEL);rect(0,17,W,1,BORDER);
  text(7,5,"FLYWIRE",MINT);rect(57,5,1,7,BORDER);
- const char *title[4]={"3D ARENA","CONNECTOME","TELEMETRY","GUIDE"};
+ const char *title[5]={"3D ARENA","CONNECTOME","TELEMETRY","GUIDE","PET"};
  text(65,5,fly.page==0?(fly.zoom==2?"TOP VIEW":fly.zoom==1?"CLOSE 3D":title[0]):title[fly.page],INK);
- rect(200,4,33,10,fly.paused?RED:CARD);text(203,6,fly.paused?"PAUSE":fly.auto_mode?"AUTO":"MAN",fly.paused?CORAL:MINT);
+ if(fly.page==4){text(91,5,pet_status(),fly.pet.dead?CORAL:MINT);right_number(180,5,fly.pet.age/1800,MUTED);text(182,5,"M",MUTED);}
+ rect(200,4,33,10,fly.paused?RED:CARD);text(203,6,fly.paused?"PAUSE":fly.pet.mode?"PET":fly.auto_mode?"AUTO":"MAN",fly.paused?CORAL:MINT);
  rect(0,136,W,11,PANEL);
  if(fly.page==0){text(7,138,state_names[fly.state],MINT);text(50,138,"A GROOM B FLY A+B VIEW",MUTED);}
  else if(fly.page==1){extern const char root_labels[NEURONS][19];text(7,138,root_labels[fly.selected],INK);text(122,138,"DPAD NODE A LINKS",MUTED);}
  else if(fly.page==2)text(7,138,"A RESET  B BODY  START PAUSE",MUTED);
- else text(7,138,"V783 SUBSET / DEMO DYNAMICS",MUTED);
+ else if(fly.page==4){
+  if(fly.pet.reset_hold>0){text(7,138,"NEW FLY: HOLD A+B",GOLD);number(122,138,fly.pet.reset_hold*100/90,GOLD);}
+  else if(fly.pet.feedback_timer){
+   const char *msg[11]={"","FOOD OFFERED","WATER GIVEN","GENTLE TOUCH","PLAY TIME","ALL CLEAN","SLEEP TOGGLED","RECOVERING","OUCH!","TOO TIRED","MEDIC COOLDOWN"};
+   text(7,138,msg[fly.pet.feedback],fly.pet.feedback==8?CORAL:MINT);text(122,138,"B CARE MENU",MUTED);
+  }else{text(7,138,care_names[fly.pet.action],GOLD);text(50,138,"A USE B MENU DPAD PICK",MUTED);}
+ }else text(7,138,"V783 SUBSET / DEMO DYNAMICS",MUTED);
  rect(0,147,W,13,BG);text(5,151,"<",MUTED);text(228,151,">",MUTED);
- const char *tabs[4]={"LAB","BRAIN","DATA","HELP"};
- for(int i=0;i<4;i++){int x=22+i*48;if(i==fly.page){rect(x,148,44,11,TEAL);rect(x,148,44,1,MINT);}text(x+7,151,tabs[i],i==fly.page?WHITE:MUTED);}
+ const char *tabs[5]={"LAB","BRAIN","DATA","HELP","PET"};
+ for(int i=0;i<5;i++){int x=18+i*42;if(i==fly.page){rect(x,148,39,11,TEAL);rect(x,148,39,1,MINT);}text(x+4,151,tabs[i],i==fly.page?WHITE:MUTED);}
 }
 void render(void){
  clip(0,0,W,H);
  if(fly.page!=0)rect(0,18,W,118,BG);
- if(fly.page==0)arena();else if(fly.page==1)brain();else if(fly.page==2)stats();else help();
+ if(fly.page==0)arena();else if(fly.page==1)brain();else if(fly.page==2)stats();else if(fly.page==4)pet_screen();else help();
  chrome();
 }

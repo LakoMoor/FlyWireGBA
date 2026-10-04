@@ -39,5 +39,6 @@ jobs:
             docs/screenshots/*.png
             docs/preview.png
             docs/demo.gif
+            docs/pet.gif
           if-no-files-found: error
           retention-days: 14

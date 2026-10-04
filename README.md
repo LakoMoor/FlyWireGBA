@@ -3,7 +3,7 @@
 [![CI](https://github.com/LakoMoor/FlyWireGBA/actions/workflows/ci.yml/badge.svg)](https://github.com/LakoMoor/FlyWireGBA/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/LakoMoor/FlyWireGBA)](https://github.com/LakoMoor/FlyWireGBA/releases/latest)
 
-A **Game Boy Advance ROM** featuring an articulated fruit fly, a small real FlyWire connectome, and live neural and behavioral telemetry.
+A **Game Boy Advance ROM** featuring an articulated fruit fly, a small real FlyWire connectome, live neural and behavioral telemetry, and a persistent Tamagotchi mode.
 
 **[Download the `.gba` from GitHub Releases](https://github.com/LakoMoor/FlyWireGBA/releases/latest)** and open it in [mGBA](https://mgba.io/) or load it on a compatible GBA flash cartridge. A local build produces `dist/fly.gba`.
 
@@ -16,6 +16,8 @@ A **Game Boy Advance ROM** featuring an articulated fruit fly, a small real FlyW
 - An anatomical **flybody** model developed by Google DeepMind and HHMI Janelia: connected head and thorax, compound eyes, segmented abdomen, antennae, six articulated legs, wings with veins, and a proboscis.
 - Offline rendering of the articulated 3D model into transparent, shaded sprites. The GBA selects the appropriate direction and animation frame; the arena uses software perspective projection. This keeps the model detailed without running MuJoCo or a large mesh renderer on the handheld.
 - Idle, alternating tripod walk, flight with folded legs and moving wings, feeding, head grooming, and rest. Takeoff and landing follow the simulation's changing height.
+- Tamagotchi care: feed, water, touch, play, clean, sleep, medicine, and hit. Health, food, water, energy, cleanliness, stress, bond, and age respond to care or neglect; hitting causes injury and a fleeing animation.
+- Two-bank SRAM saves with checksums and recovery after an interrupted write.
 - Autonomous sugar seeking, obstacle avoidance, hunger and energy, plus manual movement and turning.
 - Standard, close, and overhead views; an arena minimap; separate energy and hunger indicators.
 - A real reduced **FlyWire FAFB v783** network: **128 neurons and 2,048 directed signed edges**, including 20 surviving sugar sensory IDs and one MN9 from the lists published by Shiu et al.
@@ -27,7 +29,7 @@ A **Game Boy Advance ROM** featuring an articulated fruit fly, a small real FlyW
 
 | GBA button | Action |
 |---|---|
-| L / R | Cycle arena, neural map, telemetry, and help |
+| L / R | Cycle arena, neural map, telemetry, help, and PET |
 | Select | Toggle autonomous / manual control |
 | Up / Down | Move forward / backward in manual arena mode |
 | Left / Right | Turn in manual arena mode |
@@ -38,9 +40,21 @@ A **Game Boy Advance ROM** featuring an articulated fruit fly, a small real FlyW
 | D-pad on neural map | Select a neuron |
 | A on neural map | Show / hide connections |
 | B on telemetry page | General / body and behavior metrics |
-| A on telemetry page | Reset the session |
+| A on telemetry page | Reset lab telemetry while preserving the pet |
 
 Press Select first for full manual control. In AUTO mode, the simulation continues on the other pages. Ground contact with sugar stimulates the sensory neurons; MN9 spikes gate food intake. Movement, energy, voltage, and distance use demonstration units.
+
+## Tamagotchi mode
+
+Press **L from LAB** to enter PET. Use the D-pad to choose one of eight actions, **B** to open/close the care menu, and **A** to apply the selected action. **Start** pauses. Hold **A+B for three seconds** to create a new fly, replacing the previous pet.
+
+Food is offered for four seconds; MN9 activity gates intake. Sleep restores energy, touch reduces stress and builds bond, and medicine restores health with a 30-second cooldown. Hitting removes 10% health, raises stress, reduces bond, and triggers fleeing. Neglect can end the pet's life; care does not resurrect a dead fly.
+
+Pet time advances only while PET mode is active, including its neural, data, and help pages. Selecting LAB suspends pet time and restores the laboratory simulation. Age is shown in minutes; DATA shows feeding ticks and hits. Needs and bond use 0–100 game scales.
+
+Care events and a 30-second checkpoint automatically save to 32 KiB SRAM. Enable save persistence in your emulator or flash cartridge and keep its `.sav` file. Reopening resumes the saved pet; elapsed time while the ROM is closed does not affect it. Up to 30 seconds of idle progress can be lost on closing. Health, stress, bond, and lifespan are game rules, not measured biological properties.
+
+![Tamagotchi care running in the actual GBA ROM](docs/pet.gif)
 
 ## Scientific scope
 
@@ -73,7 +87,7 @@ python3 tools/run_emulator_check.py --source /path/mgba --build /path/mgba-build
 python3 tools/export_media.py  # Pillow; uses actual emulator captures
 ```
 
-It covers boot, movement, flight/landing, grooming, feeding, all three views, neural and telemetry pages, and pause. See [validation](docs/validation.md) for results and limits. Physical GBA hardware has not been tested.
+It covers boot, movement, flight/landing, grooming, feeding, all three views, neural and telemetry pages, pause, pet care, neglect, reset, SRAM reboot persistence, and interrupted-save recovery. See [validation](docs/validation.md) for results and limits. Physical GBA hardware has not been tested.
 
 ## Regenerate assets
 
@@ -96,7 +110,7 @@ A `vX.Y.Z` tag triggers the release workflow. After validation, it publishes a `
 
 ```sh
 make all test
-python3 tools/package_release.py --tag v0.1.1
+python3 tools/package_release.py --tag v0.2.0
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the release procedure. Actions and downloaded test sources are pinned by SHA/hash.

@@ -8,7 +8,7 @@ SECTIONS {
  .text : { KEEP(*(.header)) *(.text.start) *(.romcode*) } > ROM
  .iwram : ALIGN(4) { __iwram_start = .; *(.text*) . = ALIGN(4); __iwram_end = .; } > IWRAM AT > ROM
  __iwram_load = LOADADDR(.iwram);
- .rodata : { *(.rodata*) } > ROM
+ .rodata : { KEEP(*(.save_signature)) *(.rodata*) } > ROM
  .bss (NOLOAD) : ALIGN(4) { __bss_start = .; *(.bss*) *(COMMON) . = ALIGN(4); __bss_end = .; } > EWRAM
  .data : { *(.data*) } > EWRAM AT > ROM
  /DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) *(.note*) }

@@ -12,6 +12,8 @@ static struct mLogger logger={quiet,NULL};
 static struct mCore *core;
 static color_t screen[240*160];
 static uint32_t base;
+#define PREAD(field) core->busRead32(core,base+offsetof(Fly,pet)+offsetof(Pet,field))
+#define PWRITE(field,value) core->busWrite32(core,base+offsetof(Fly,pet)+offsetof(Pet,field),(uint32_t)(value))
 #define READ(field) core->busRead32(core,base+offsetof(Fly,field))
 static void run(int n,unsigned keys){core->setKeys(core,keys);for(int i=0;i<n;i++)core->runFrame(core);}
 static void save(const char *path){FILE *f=fopen(path,"wb");assert(f);fprintf(f,"P6\n240 160\n255\n");for(int i=0;i<240*160;i++){unsigned char rgb[3]={screen[i]&255,(screen[i]>>8)&255,(screen[i]>>16)&255};fwrite(rgb,1,3,f);}fclose(f);}
@@ -22,7 +24,7 @@ static void demo(int frames,unsigned keys){for(int i=0;i<frames;i++){run(6,keys)
 int main(int argc,char **argv){
  if(argc!=3){fprintf(stderr,"usage: emulator_check ROM FLY_SYMBOL_ADDRESS\n");return 1;}
  setbuf(stdout,NULL);mLogSetDefaultLogger(&logger);base=(uint32_t)strtoul(argv[2],NULL,16);core=mCoreFind(argv[1]);assert(core&&core->init(core));mCoreInitConfig(core,"flygba-test");
- core->setVideoBuffer(core,screen,240);assert(mCoreLoadFile(core,argv[1]));core->reset(core);
+ core->setVideoBuffer(core,screen,240);assert(mCoreLoadFile(core,argv[1]));core->reset(core);core->busWrite8(core,0x0e000084,0);core->busWrite8(core,0x0e000184,0);core->reset(core);
  run(120,0);printf("Boot: ticks=%u fps=%u cpu=%u frame_cycles=%u render_cycles=%u\n",READ(ticks),READ(fps),READ(cpu),READ(frame_cycles),READ(render_cycles));save("build/emulator-arena.ppm");assert(READ(ticks)>=45&&READ(ticks)<=65);
  run(16,KEY_SELECT);run(16,0);assert(READ(auto_mode)==0);
  run(50,KEY_B|KEY_UP);assert(READ(height)>0&&READ(state)==FLIGHT);save("build/emulator-flight.ppm");
@@ -74,5 +76,37 @@ int main(int argc,char **argv){
  demo(16,KEY_UP);demo(8,KEY_RIGHT);demo(16,KEY_B|KEY_UP);demo(10,0);demo(12,KEY_A);demo(2,0);
  WRITE(x,-95*256);WRITE(z,-80*256);WRITE(hunger,480);WRITE(heading,24);demo(12,0);
  run(16,KEY_R);demo(10,0);run(16,KEY_R);demo(10,0);
+ /* Care actions use the real keypad; RAM setup chooses deterministic needs. */
+ run(16,KEY_R);run(30,0);assert(READ(page)==3);
+ run(16,KEY_R);run(60,0);assert(READ(page)==4&&PREAD(mode));
+ printf("Pet: fps=%u cpu=%u\n",READ(fps),READ(cpu));assert(READ(fps)>=25);save("build/emulator-pet.ppm");run(16,KEY_B);run(16,0);assert(PREAD(menu));save("build/emulator-pet-menu.ppm");
+ run(16,KEY_A);run(120,0);assert(PREAD(feeds)>0&&PREAD(hunger)<450);save("build/emulator-pet-feed.ppm");
+ PWRITE(action,CARE_HIT);uint32_t health=PREAD(health);run(16,KEY_A);run(16,0);
+ assert(PREAD(health)==health-100&&PREAD(hits)==1&&READ(state)==FLIGHT);save("build/emulator-pet-hit.ppm");
+ run(80,0);PWRITE(action,CARE_SLEEP);run(16,KEY_A);run(30,0);assert(PREAD(sleeping));save("build/emulator-pet-sleep.ppm");
+ uint32_t hits=PREAD(hits),feeds=PREAD(feeds);health=PREAD(health);
+ void *sram=NULL;size_t save_size=core->savedataClone(core,&sram);assert(save_size==32768&&sram);
+ core->deinit(core);core=mCoreFind(argv[1]);assert(core&&core->init(core));mCoreInitConfig(core,"flygba-test");
+ core->setVideoBuffer(core,screen,240);assert(mCoreLoadFile(core,argv[1]));core->reset(core);run(120,0);assert(core->savedataRestore(core,sram,save_size,true));free(sram);
+ core->reset(core);run(30,0);assert(READ(page)==4&&PREAD(mode)&&PREAD(sleeping)&&PREAD(hits)==hits&&PREAD(feeds)==feeds&&PREAD(health)>=health);
+ puts("mGBA: care, MN9 feeding, hit/flee, sleep and SRAM reboot persistence passed");
+ /* Simulate an interrupted bank write: ignore its missing commit marker. */
+ uint32_t g0=0,g1=0;for(int i=0;i<4;i++){g0|=(uint32_t)core->busRead8(core,0x0e000080+i)<<(8*i);g1|=(uint32_t)core->busRead8(core,0x0e000180+i)<<(8*i);}
+ unsigned bank=g1>g0?1:0;core->busWrite8(core,0x0e000084+bank*256,0);
+ core->reset(core);run(30,0);assert(READ(page)==4&&PREAD(hits)==1);
+ puts("mGBA: interrupted SRAM write recovers the previous valid bank");
+ /* Record a short pet walkthrough from actual cartridge output. */
+ PWRITE(sleeping,0);PWRITE(action,CARE_PET);run(40,0);
+ for(int a=0;a<CARE_COUNT;a++){
+  PWRITE(action,a);run(16,KEY_B);run(16,0);
+  for(int i=0;i<5;i++){run(6,0);char name[80];snprintf(name,sizeof(name),"build/pet-%03d.ppm",a*15+i);save(name);}
+  run(16,KEY_A);
+  for(int i=5;i<15;i++){run(6,0);char name[80];snprintf(name,sizeof(name),"build/pet-%03d.ppm",a*15+i);save(name);}
+ }
+ PWRITE(health,0);run(16,0);assert(PREAD(dead));save("build/emulator-pet-dead.ppm");
+ run(200,KEY_A|KEY_B);assert(!PREAD(dead)&&PREAD(hits)==0);run(16,0);
+ core->busWrite8(core,0x0e000084,0);core->busWrite8(core,0x0e000184,0);
+ core->reset(core);run(30,0);assert(READ(page)==0&&PREAD(health)==1000);
+ puts("mGBA: death, held-button new pet and invalid-save fallback passed");
  core->deinit(core);puts("mGBA boot, movement, flight, tabs and pause passed");return 0;
 }

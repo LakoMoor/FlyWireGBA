@@ -22,6 +22,13 @@
 
 typedef struct { uint8_t pre, post; int16_t weight; } Edge;
 typedef struct { int x,z,r; } Object;
+enum {CARE_FEED,CARE_WATER,CARE_PET,CARE_PLAY,CARE_CLEAN,CARE_SLEEP,CARE_MEDIC,CARE_HIT,CARE_COUNT};
+typedef struct {
+ int mode,health,hunger,energy,water,clean,stress,bond;
+ int sleeping,dead,action,menu,food_timer,fear_timer,play_timer,cooldown,medicine;
+ int feedback,feedback_timer,reset_hold,dirty;
+ uint32_t age,feeds,hits;
+} Pet;
 typedef struct {
  int x,z,heading,height,speed,energy,hunger,odor,touch,food_dist,nearest;
  int state,auto_mode,paused,page,selected,zoom; uint32_t ticks,distance,meals,collisions;
@@ -30,6 +37,7 @@ typedef struct {
  uint16_t spike_count,rate,active,history[HISTORY],history_pos,second_spikes;
  uint32_t state_ticks[6]; int motor,stimulus,show_links;
  int fps,cpu,render_cycles,frame_cycles,stats_detail;
+ Pet pet;
 } Fly;
 enum {IDLE,WALK,FLIGHT,FEED,GROOM,REST};
 extern Fly fly;
@@ -53,4 +61,13 @@ void rect(int x,int y,int w,int h,int c);
 void text(int x,int y,const char *str,int c);
 void number(int x,int y,int value,int c);
 void neural_step(void);
+extern const char *const care_names[CARE_COUNT];
+void pet_reset(void);
+void pet_enter(void);
+void pet_leave(void);
+void pet_step(uint16_t keys,uint16_t hit);
+const char *pet_status(void);
+#define PET_SAVE_SIZE 128
+void pet_encode(uint8_t out[PET_SAVE_SIZE]);
+int pet_decode(const uint8_t in[PET_SAVE_SIZE]);
 #endif

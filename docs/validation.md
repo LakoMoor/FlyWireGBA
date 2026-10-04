@@ -6,15 +6,16 @@ manifest and `SHA256SUMS`.
 
 Local ROM: `dist/fly.gba`, 16,777,216 bytes.
 
-SHA-256: `df541929673e7dd5688fd3b42fe9e0e76cb7f4355663e6d286ba0609d568012e`.
+SHA-256: `1eeb98808177438d1dae9274bffd12b409925de72984d29ffc701ddb743cda43`.
 
 ## Memory
 
 | Resource | Used | Available |
 |---|---:|---:|
 | Padded cartridge ROM | 16 MiB | 32 MiB |
-| EWRAM static data | 39,712 bytes | 262,144 bytes |
-| IWRAM executable code | 26,428 bytes | 32,768 bytes |
+| EWRAM static data | 39,944 bytes | 262,144 bytes |
+| IWRAM executable code | 27,904 bytes | 32,768 bytes |
+| SRAM pet saves | 512 bytes (two banks) | 32,768 bytes |
 | Framebuffer, included in EWRAM above | 38,400 bytes | — |
 | Bitmap VRAM pages, including page gap | 81,920 bytes | 98,304 bytes |
 
@@ -37,6 +38,9 @@ Checks passed:
   fly on sugar through emulated RAM, then checks circuit-driven intake.
 - Standard, close, and overhead views, neural map, both telemetry pages, help,
   pause, and resume.
+- PET keypad actions, MN9 feeding, hit/flee, sleep, death and held-button reset.
+- SRAM export to a fresh emulator core, cartridge boot and restored pet state.
+- Interrupted bank write recovery and invalid-save fallback.
 - 288 visual captures: 16 headings × six behaviors × three views, with state
   frozen through emulated RAM to inspect attachments and occlusion. Each viewport is compared pixel by pixel against native rendering, allowing one RGB level for color expansion.
 
@@ -46,7 +50,8 @@ Representative hardware-timer readings after the model update:
 |---|---:|---:|---:|
 | Standard arena | 29 | 30 FPS | 67% |
 | Overhead arena | 29 | 30 FPS | 73% |
-| General telemetry | 29 | 30 FPS | 62% |
+| General telemetry | 29 | 30 FPS | 63% |
+| PET | 29 | 30 FPS | 74% |
 
 These are representative measurements, not a guaranteed worst-case minimum.
 The ROM measures them continuously. Simulation advances at 30 Hz independently
@@ -86,6 +91,7 @@ and the animation/turntable sheets linked there.
 
 ASan/UBSan checks cover movement, takeoff/landing, grooming, rest, obstacles,
 view changes, neuron selection, page switching, pause, and six autonomous minutes.
+Pet tests also cover all care actions, bond/stress, medicine cooldown, neglect death, menu rendering, page routing, reset latching and save corruption/range rejection.
 Position, energy, and hunger remain bounded; the fly moves and feeds.
 
 The sugar-contact test produced 17,936 spikes and 67 food-intake ticks over 300
@@ -93,6 +99,5 @@ model ticks; hunger fell from 480 to 3. Data tests check 128 unique root IDs,
 published sensory/motor seeds, all 2,048 edges against retained source IDs,
 signs and quantized weights, and the cartridge header/checksum/size.
 
-Physical GBA/flash-cartridge operation has not been tested. Audio and saved
-sessions are not implemented. Neural dynamics, behavioral control, and body
+Physical GBA/flash-cartridge operation has not been tested. Audio is not implemented. SRAM preserves the pet; laboratory sessions are not saved. Neural dynamics, behavioral control, and body
 animations are illustrative; these checks do not establish biological accuracy.

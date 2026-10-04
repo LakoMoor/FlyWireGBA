@@ -9,7 +9,7 @@ defs=re.search(r'^C_DEFINES = (.*)$',flags,re.M).group(1).split()
 libs=['-lz','-ledit','-lpthread']
 if sys.platform=='darwin':libs+=['-framework','CoreFoundation']
 else:libs+=['-lm','-ldl']
-subprocess.run([os.environ.get('CC','cc'),'-O2',*defs,'-I'+str(source/'include'),'-I'+str(build/'include'),'-Isrc','tools/emulator_check.c','src/sim.c','src/render.c','src/connectome.c','src/palette.c','src/sprites.S',str(build/'libmgba.a'),*libs,'-o','build/emulator_check'],check=True)
+subprocess.run([os.environ.get('CC','cc'),'-O2',*defs,'-I'+str(source/'include'),'-I'+str(build/'include'),'-Isrc','tools/emulator_check.c','src/sim.c','src/pet.c','src/render.c','src/connectome.c','src/palette.c','src/sprites.S',str(build/'libmgba.a'),*libs,'-o','build/emulator_check'],check=True)
 nm=os.environ.get('LLVM_NM',shutil.which('llvm-nm') or '/opt/homebrew/opt/llvm/bin/llvm-nm')
 symbols=subprocess.check_output([nm,'-n','build/fly.elf'],text=True)
 address=re.search(r'^(\w+) B fly$',symbols,re.M).group(1)
