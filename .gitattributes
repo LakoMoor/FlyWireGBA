@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.gba binary
+*.gif binary
+*.png binary

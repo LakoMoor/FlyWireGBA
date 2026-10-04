@@ -1,0 +1,43 @@
+name: CI
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CC: clang
+      CLANG: /usr/bin/clang
+      LD_LLD: /usr/bin/ld.lld
+      LLVM_OBJCOPY: /usr/bin/llvm-objcopy
+      LLVM_NM: /usr/bin/llvm-nm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install build and emulator dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm cmake build-essential pkg-config zlib1g-dev libedit-dev python3-pil
+      - name: Build, sanitize, validate data and run the cartridge in mGBA
+        run: bash tools/ci_check.sh
+      - name: Package candidate build
+        run: python3 tools/package_release.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flywire-gba-${{ github.sha }}
+          path: |
+            dist/release/*
+            docs/screenshots/*.png
+            docs/preview.png
+            docs/demo.gif
+          if-no-files-found: error
+          retention-days: 14

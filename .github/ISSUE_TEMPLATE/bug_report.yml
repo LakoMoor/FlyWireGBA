@@ -1,0 +1,23 @@
+name: Bug report
+description: Report a ROM, rendering or control issue.
+body:
+  - type: input
+    id: version
+    attributes:
+      label: ROM version
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Emulator or hardware
+      placeholder: mGBA 0.10.5 / GBA with flash cartridge
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened and how to reproduce it?
+    validations:
+      required: true
