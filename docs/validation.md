@@ -14,7 +14,7 @@ SHA-256: `1eeb98808177438d1dae9274bffd12b409925de72984d29ffc701ddb743cda43`.
 |---|---:|---:|
 | Padded cartridge ROM | 16 MiB | 32 MiB |
 | EWRAM static data | 39,944 bytes | 262,144 bytes |
-| IWRAM executable code | 27,904 bytes | 32,768 bytes |
+| IWRAM executable code | 27,924 bytes | 32,768 bytes |
 | SRAM pet saves | 512 bytes (two banks) | 32,768 bytes |
 | Framebuffer, included in EWRAM above | 38,400 bytes | — |
 | Bitmap VRAM pages, including page gap | 81,920 bytes | 98,304 bytes |
